@@ -9,7 +9,19 @@ export default function StoreCard({
   onRate,
 }) {
   return (
-    <article className="overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)] transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+    <article
+      role={onView ? "button" : undefined}
+      tabIndex={onView ? 0 : undefined}
+      aria-label={onView ? `View ${store.name}` : undefined}
+      onClick={() => onView?.(store)}
+      onKeyDown={(event) => {
+        if (onView && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onView(store);
+        }
+      }}
+      className="overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)] transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#dc2626]/20"
+    >
       <div className="flex h-36 items-center justify-center bg-[#f8fafc] text-[#9ca3af]">
         {store.image ? (
           <img src={store.image} alt={store.name} className="h-full w-full object-cover" />
@@ -32,7 +44,7 @@ export default function StoreCard({
         </div>
 
         <div className="mt-4 flex gap-2">
-          <Button size="sm" variant="outline" className="flex-1" onClick={() => onView?.(store)}>
+          <Button size="sm" variant="outline" className="flex-1" onClick={(event) => { event.stopPropagation(); onView?.(store); }}>
             View Store
           </Button>
           {onRate && (

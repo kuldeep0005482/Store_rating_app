@@ -29,7 +29,7 @@ Signup supports `USER`, `STORE_OWNER`, and `ADMIN` roles. In a production deploy
 | Path | Role |
 |---|---|
 | `/stores` | USER, STORE_OWNER |
-| `/stores/:storeId` | USER, STORE_OWNER |
+| `/stores/:storeId` | Store details, gallery, ratings, comments and replies — USER, STORE_OWNER |
 
 ## Store Owner
 

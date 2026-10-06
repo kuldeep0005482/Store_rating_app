@@ -57,6 +57,11 @@ export const loginSchema = z.object({ email, password: z.string().min(1) });
 
 export const ratingSchema = z.object({
   value: z.coerce.number().int().min(1).max(5),
+  comment: z.string().trim().max(500).optional().default(''),
+});
+
+export const replySchema = z.object({
+  comment: z.string().trim().min(1, 'Reply cannot be empty').max(500),
 });
 
 export const passwordSchema = z.object({

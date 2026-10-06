@@ -1,22 +1,97 @@
-
 import React, { useEffect, useState } from "react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Star, ArrowLeft } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
-import { api } from "../../services/api";
-
-function Stars({ value }) {
-  return <div className="flex gap-0.5">{[1,2,3,4,5].map(n=><Star key={n} size={14} className={n<=value?"fill-[#f59e0b] text-[#f59e0b]":"text-[#d1d5db]"}/>)}</div>;
-}
-
-function formatDate(value) {
-  return value ? new Date(value).toLocaleString("en-IN") : "—";
-}
+import Skeleton from "../../components/ui/Skeleton";
+import EmptyState from "../../components/ui/EmptyState";
+import { ReviewCard } from "../../components/reviews";
+import { extractList, getOwnerReviews, normalizeReview, replyToReview } from "../../services/reviews";
+import { useAuth } from "../../context/AuthContext";
 
 export default function OwnerRatings() {
-  const navigate=useNavigate(); const [rows,setRows]=useState([]); const [loading,setLoading]=useState(true); const [error,setError]=useState("");
-  useEffect(()=>{api.get("/owner/ratings?page=1&limit=100").then(r=>setRows(r.data||[])).catch(e=>setError(e.message)).finally(()=>setLoading(false))},[]);
-  return <AdminLayout activeItem="Ratings"><div className="mx-auto max-w-[1100px]"><div className="mb-5 flex items-center justify-between"><div><h1 className="text-2xl font-bold">Ratings</h1><p className="mt-1 text-sm text-[#6b7280]">All ratings submitted for your store.</p></div><Button variant="outline" icon={ArrowLeft} onClick={()=>navigate("/owner/dashboard")}>Dashboard</Button></div><Card>{error&&<p className="p-3 text-sm text-red-600">{error}</p>}{loading?<p className="p-5 text-sm">Loading ratings...</p>:<div className="overflow-x-auto"><table className="w-full min-w-[650px]"><thead><tr className="border-b bg-[#fafafa] text-left text-xs text-[#64748b]"><th className="p-3">#</th><th className="p-3">User</th><th className="p-3">Rating</th><th className="p-3">Date</th></tr></thead><tbody>{rows.map((r,i)=><tr key={r.id} className="border-b last:border-0"><td className="p-3 text-xs">{i+1}</td><td className="p-3 text-xs font-semibold">{r.user?.name || "Unknown"}</td><td className="p-3"><Stars value={r.rating||r.value}/></td><td className="p-3 text-xs text-[#64748b]">{formatDate(r?.createdAt || r?.date)}</td></tr>)}</tbody></table></div>}</Card></div></AdminLayout>;
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [replyingId, setReplyingId] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await getOwnerReviews();
+      setRows(extractList(result, ["reviews", "ratings"]).map(normalizeReview));
+    } catch (loadError) {
+      setError(loadError.message || "Unable to load ratings.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleReply = async (review, reply, done) => {
+    setReplyingId(review.id);
+    try {
+      const response = await replyToReview(review.id, reply);
+      const created = response?.data?.reply || response?.reply || response?.data || {
+        id: `local-${Date.now()}`,
+        comment: reply,
+        createdAt: new Date().toISOString(),
+        user: { id: user?.id, name: user?.name || "Store Owner" },
+      };
+      setRows((current) => current.map((item) => item.id === review.id ? { ...item, replies: [...(item.replies || []), created] } : item));
+      done?.();
+    } catch (replyError) {
+      setError(replyError.message || "Unable to reply to this comment.");
+    } finally {
+      setReplyingId(null);
+    }
+  };
+
+  return (
+    <AdminLayout activeItem="Ratings">
+      <div className="mx-auto w-full max-w-[1100px]">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Ratings & Comments</h1>
+            <p className="mt-1 text-sm text-[#6b7280]">Review every customer rating and reply to written feedback.</p>
+          </div>
+          <Button variant="outline" icon={ArrowLeft} onClick={() => navigate("/owner/dashboard")}>Dashboard</Button>
+        </div>
+
+        {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+        {loading ? (
+          <div className="space-y-4">
+            {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-xl" />)}
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState title="No ratings yet" description="Customer ratings for your store will appear here." />
+        ) : (
+          <div className="space-y-4">
+            <Card className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-[#111827]">Customer feedback</p>
+                <p className="mt-1 text-xs text-[#6b7280]">{rows.length} ratings loaded</p>
+              </div>
+              <div className="flex items-center gap-2 rounded-full bg-[#fff1f2] px-3 py-1.5 text-xs font-semibold text-[#dc2626]"><MessageCircle size={14} /> {rows.filter((row) => row.comment).length} comments</div>
+            </Card>
+            {rows.map((review) => (
+              <ReviewCard
+                key={review.id}
+                review={review}
+                canReply
+                replying={replyingId === review.id}
+                onReply={handleReply}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </AdminLayout>
+  );
 }

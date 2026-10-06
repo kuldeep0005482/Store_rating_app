@@ -24,6 +24,7 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   ownedStores  Store[]   @relation("StoreOwner")
   ratings      Rating[]
+  replies      Reply[]
 
   @@index([name])
   @@index([role])
@@ -50,15 +51,32 @@ model Store {
 model Rating {
   id        Int      @id @default(autoincrement())
   value     Int
+  comment   String?  @db.VarChar(500)
   userId    Int      @map("user_id")
   storeId   Int      @map("store_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  replies   Reply[]
 
   @@unique([userId, storeId])
   @@index([storeId])
   @@index([userId])
   @@map("ratings")
+}
+
+model Reply {
+  id        Int      @id @default(autoincrement())
+  comment   String   @db.VarChar(500)
+  ratingId  Int      @map("rating_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  rating    Rating   @relation(fields: [ratingId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([ratingId])
+  @@index([userId])
+  @@map("replies")
 }

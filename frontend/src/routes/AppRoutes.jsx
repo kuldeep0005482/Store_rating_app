@@ -26,12 +26,13 @@ import Signup from "../pages/Signup";
 import { api } from "../services/api";
 import { getHomePath } from "../utils/auth";
 import { useAuth } from "../context/AuthContext";
+import RouteTransition from "../components/layout/RouteTransition";
 
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { setAuthenticatedUser } = useAuth();
-  const [email, setEmail] = useState("admin@storerate.com");
+  const [email, setEmail] = useState("admin@example.com");
   const [password, setPassword] = useState("Admin@123");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -84,7 +85,9 @@ function NotFound() {
 
 export default function AppRoutes() {
   return (
-    <Routes>
+    <>
+      <RouteTransition />
+      <Routes>
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
@@ -121,7 +124,8 @@ export default function AppRoutes() {
       </Route>
 
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
 

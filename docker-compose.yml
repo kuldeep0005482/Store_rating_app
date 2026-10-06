@@ -1,16 +1,59 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: store-rating-postgres
+    container_name: storerate-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: store_rating
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d store_rating"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - storerate
+
+  backend:
+    build:
+      context: ./backend
+    container_name: storerate-backend
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/store_rating?schema=public
+      JWT_SECRET: "storerate-reviewer-secret-change-in-production"
+      JWT_EXPIRES_IN: 1d
+      CLIENT_URL: http://localhost
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "5000"
+    networks:
+      - storerate
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    container_name: storerate-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    networks:
+      - storerate
 
 volumes:
   postgres_data:
+
+networks:
+  storerate:
+    driver: bridge

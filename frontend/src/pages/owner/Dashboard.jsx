@@ -17,6 +17,9 @@ import { api } from "../../services/api";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Avatar from "../../components/ui/Avatar";
+import Skeleton from "../../components/ui/Skeleton";
+import { ReviewCard } from "../../components/reviews";
+import { extractList, getOwnerReviews, normalizeReview, replyToReview } from "../../services/reviews";
 
 
 // ============================================================
@@ -689,192 +692,141 @@ function RecentRatingsMobile({
 // ============================================================
 
 export default function Dashboard() {
-
   const navigate = useNavigate();
-  const store = STORE;
+  const [store, setStore] = useState(STORE);
+  const [reviews, setReviews] = useState(
+    RECENT_RATINGS.map((item) => normalizeReview({
+      id: item.id,
+      rating: item.rating,
+      createdAt: item.date,
+      user: { name: item.user },
+      comment: "",
+    })),
+  );
+  const [loading, setLoading] = useState(true);
+  const [replyingId, setReplyingId] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const [storeResult, reviewResult] = await Promise.all([
+          api.get("/owner/store"),
+          getOwnerReviews(),
+        ]);
+        if (!active) return;
+
+        const ownerStore = storeResult?.data?.store || storeResult?.data || storeResult?.store;
+        if (ownerStore) setStore((current) => ({ ...current, ...ownerStore, id: ownerStore.id || current.id }));
+
+        const ownerReviews = extractList(reviewResult, ["reviews", "ratings"]).map(normalizeReview);
+        if (ownerReviews.length) setReviews(ownerReviews);
+      } catch (loadError) {
+        if (active) setError(loadError.message || "Unable to load your latest store activity.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const average = reviews.length
+    ? reviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) / reviews.length
+    : Number(store.rating || 0);
   const statsData = {
-    averageRating: store.rating,
-    totalUsersRated: store.totalUsersRated,
+    averageRating: average,
+    totalUsersRated: Number(store.totalUsersRated ?? store.totalRatings ?? reviews.length),
   };
-  const totalRatings = store.totalRatings;
-  const distribution = RATING_DISTRIBUTION;
-  const recentRatings = RECENT_RATINGS;
+  const totalRatings = Number(store.totalRatings ?? store.ratingsCount ?? reviews.length);
+  const distribution = useMemo(() => {
+    const total = reviews.length;
+    return [5, 4, 3, 2, 1].map((stars) => {
+      const count = reviews.filter((item) => Number(item.rating) === stars).length;
+      return { stars, count, percentage: total ? Math.round((count / total) * 100) : 0 };
+    });
+  }, [reviews]);
+  const recentRatings = reviews.slice(0, 5).map((item) => ({
+    id: item.id,
+    user: item.user?.name || "Customer",
+    rating: item.rating,
+    date: item.createdAt ? new Date(item.createdAt).toLocaleString("en-IN") : "Recently",
+  }));
 
+  const handleViewStore = () => navigate(`/stores/${store.id}`);
+  const handleEditStore = () => navigate("/owner/store/edit");
+  const handleViewRatings = () => navigate("/owner/ratings");
 
-  const handleViewStore = () => {
-    navigate(`/stores/${store.id}`);
+  const handleOwnerReply = async (review, reply, done) => {
+    setReplyingId(review.id);
+    setError("");
+    try {
+      const response = await replyToReview(review.id, reply);
+      const created = response?.data?.reply || response?.reply || response?.data || {
+        id: `local-${Date.now()}`,
+        comment: reply,
+        createdAt: new Date().toISOString(),
+        user: { name: "Store Owner" },
+      };
+      setReviews((current) => current.map((item) => item.id === review.id ? { ...item, replies: [...(item.replies || []), created] } : item));
+      done?.();
+    } catch (replyError) {
+      setError(replyError.message || "Unable to reply to this comment.");
+    } finally {
+      setReplyingId(null);
+    }
   };
-
-
-  const handleEditStore = () => {
-    navigate(`/owner/store/edit`);
-  };
-
-
-  const handleViewRatings = () => {
-    navigate("/owner/ratings");
-  };
-
 
   return (
     <AdminLayout activeItem="Dashboard">
-
       <div className="mx-auto w-full max-w-[1500px]">
-
-        {/* ==================================================
-            Breadcrumb
-        ================================================== */}
-
-        <div className="mb-3 flex items-center gap-2 text-[11px] text-[#9ca3af]">
-
-          <span>Home</span>
-
-          <span>/</span>
-
-          <span className="font-medium text-[#6b7280]">
-            Dashboard
-          </span>
-
-        </div>
-
-
-        {/* ==================================================
-            Page Header
-        ================================================== */}
-
+        <div className="mb-3 flex items-center gap-2 text-[11px] text-[#9ca3af]"><span>Home</span><span>/</span><span className="font-medium text-[#6b7280]">Dashboard</span></div>
         <div className="mb-5">
-
-          <h1 className="text-2xl font-bold tracking-tight text-[#111827] sm:text-[28px]">
-            My Store Dashboard
-          </h1>
-
-          <p className="mt-1 text-xs text-[#6b7280] sm:text-sm">
-            View your store performance and user ratings.
-          </p>
-
+          <h1 className="text-2xl font-bold tracking-tight text-[#111827] sm:text-[28px]">My Store Dashboard</h1>
+          <p className="mt-1 text-xs text-[#6b7280] sm:text-sm">View your store performance, ratings and customer comments.</p>
         </div>
 
+        {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-        {/* ==================================================
-            Statistics
-        ================================================== */}
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-
-          <StatCard
-            icon={Star}
-            title="Average Rating"
-            value={statsData.averageRating}
-            description={`${totalRatings} total ratings`}
-            iconClass="bg-[#fff7e6] text-[#f59e0b]"
-          />
-
-          <StatCard
-            icon={Users}
-            title="Total Users Rated"
-            value={statsData.totalUsersRated}
-            description="Unique users"
-            iconClass="bg-[#ecfdf3] text-[#16a34a]"
-          />
-
-          <StatCard
-            icon={FileText}
-            title="Total Reviews"
-            value={totalRatings}
-            description="Total reviews"
-            iconClass="bg-[#fce7f3] text-[#e11d48]"
-          />
-
-        </div>
-
-
-        {/* ==================================================
-            Store + Distribution
-        ================================================== */}
+        {loading ? (
+          <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-28 rounded-xl" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <StatCard icon={Star} title="Average Rating" value={statsData.averageRating.toFixed(1)} description={`${totalRatings} total ratings`} iconClass="bg-[#fff7e6] text-[#f59e0b]" />
+            <StatCard icon={Users} title="Total Users Rated" value={statsData.totalUsersRated} description="Unique users" iconClass="bg-[#ecfdf3] text-[#16a34a]" />
+            <StatCard icon={FileText} title="Total Reviews" value={totalRatings} description="Total reviews" iconClass="bg-[#fce7f3] text-[#e11d48]" />
+          </div>
+        )}
 
         <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-5">
-
-          {/* My Store */}
-
-          <div className="xl:col-span-3">
-
-            <MyStoreCard
-              store={store}
-              onView={handleViewStore}
-              onEdit={handleEditStore}
-            />
-
-          </div>
-
-
-          {/* Rating Distribution */}
-
-          <div className="xl:col-span-2">
-
-            <RatingDistribution
-              ratings={distribution}
-            />
-
-          </div>
-
+          <div className="xl:col-span-3"><MyStoreCard store={store} onView={handleViewStore} onEdit={handleEditStore} /></div>
+          <div className="xl:col-span-2"><RatingDistribution ratings={distribution} /></div>
         </div>
 
-
-        {/* ==================================================
-            Recent Ratings
-        ================================================== */}
-
-        <Card
-          className="mt-4 overflow-hidden"
-          contentClassName="p-0"
-        >
-
-          {/* Header */}
-
+        <Card className="mt-4 overflow-hidden" contentClassName="p-0">
           <div className="flex flex-col gap-3 border-b border-[#f1f5f9] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-
-            <div>
-
-              <h2 className="text-lg font-bold text-[#111827] sm:text-xl">
-                Recent Ratings
-              </h2>
-
-              <p className="mt-1 text-[11px] text-[#94a3b8]">
-                Latest ratings submitted for your store.
-              </p>
-
-            </div>
-
-
-            <Button
-              variant="outline"
-              size="sm"
-              icon={ExternalLink}
-              onClick={handleViewRatings}
-            >
-              View All
-            </Button>
-
+            <div><h2 className="text-lg font-bold text-[#111827] sm:text-xl">Recent Ratings</h2><p className="mt-1 text-[11px] text-[#94a3b8]">Latest ratings submitted for your store.</p></div>
+            <Button variant="outline" size="sm" icon={ExternalLink} onClick={handleViewRatings}>View All</Button>
           </div>
-
-
-          {/* Desktop */}
-
-          <RecentRatingsTable
-            ratings={recentRatings}
-          />
-
-
-          {/* Mobile */}
-
-          <RecentRatingsMobile
-            ratings={recentRatings}
-          />
-
+          <RecentRatingsTable ratings={recentRatings.length ? recentRatings : RECENT_RATINGS} />
+          <RecentRatingsMobile ratings={recentRatings.length ? recentRatings : RECENT_RATINGS} />
         </Card>
 
+        <section className="mt-4">
+          <div className="mb-3"><h2 className="text-lg font-bold text-[#111827]">Customer Comments</h2><p className="mt-1 text-xs text-[#94a3b8]">Read customer feedback and reply directly from your dashboard.</p></div>
+          {reviews.filter((item) => item.comment).length ? (
+            <div className="space-y-4">
+              {reviews.filter((item) => item.comment).slice(0, 5).map((review) => (
+                <ReviewCard key={review.id} review={review} canReply replying={replyingId === review.id} onReply={handleOwnerReply} />
+              ))}
+            </div>
+          ) : (
+            <Card className="p-6 text-center"><p className="text-sm font-semibold text-[#111827]">No written comments yet</p><p className="mt-1 text-xs text-[#6b7280]">Customer comments will appear here as soon as users submit written feedback.</p></Card>
+          )}
+        </section>
       </div>
-
     </AdminLayout>
   );
 }

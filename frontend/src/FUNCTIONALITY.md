@@ -31,3 +31,12 @@ VITE_API_URL=http://localhost:5000/api
 - STORE_OWNER: `/stores*` and `/owner/*`
 - All authenticated roles: `/settings`.
 - Backend also enforces the same roles; frontend routing is not the security boundary.
+
+## Store details, reviews and replies
+- Clicking anywhere on a user-facing store card opens `/stores/:storeId`.
+- Store details support a responsive image gallery using `image`, `images`, `imageUrls`, `photos`, or `gallery` fields.
+- Users can submit or update a 1–5 rating with an optional written comment.
+- Users can reply to review comments.
+- Store owners can see customer ratings/comments from the owner dashboard and `/owner/ratings`, and can reply to customer comments.
+- Store pages use skeleton loading states and a route-transition progress animation.
+- Review API calls try the review/rating endpoint variants supported by the frontend and fall back to the existing `PUT /stores/:id/rating` endpoint for rating submission.

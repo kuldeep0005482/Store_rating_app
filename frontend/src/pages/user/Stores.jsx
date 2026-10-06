@@ -243,10 +243,20 @@ function StoreImage({ store }) {
 // Store Card
 // ============================================================
 
-function StoreCard({ store, onRate }) {
+function StoreCard({ store, onView, onRate }) {
   return (
     <div
+      role="link"
+      tabIndex={0}
+      onClick={() => onView(store)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onView(store);
+        }
+      }}
       className="
+        cursor-pointer
         overflow-hidden
         rounded-lg
         border
@@ -326,7 +336,10 @@ function StoreCard({ store, onRate }) {
 
         <button
           type="button"
-          onClick={() => onRate(store)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRate(store);
+          }}
           className="
             mt-3
             h-9
@@ -413,7 +426,7 @@ export default function Stores() {
 
     });
 
-  }, [search]);
+  }, [search, stores]);
 
 
   // ========================================================
@@ -591,6 +604,7 @@ export default function Stores() {
                 <StoreCard
                   key={store.id}
                   store={store}
+                  onView={(selectedStore) => navigate(`/stores/${selectedStore.id}`)}
                   onRate={handleRateStore}
                 />
 

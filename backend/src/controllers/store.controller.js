@@ -1,6 +1,6 @@
 import { prisma } from '../config/db.js';
 import { asyncHandler, AppError } from '../utils/errors.js';
-import { idSchema, ratingSchema } from '../utils/validation.js';
+import { idSchema, ratingSchema, replySchema } from '../utils/validation.js';
 import { averageRating, pageParams } from '../utils/stats.js';
 
 export const listStores = asyncHandler(async (req, res) => {
@@ -65,9 +65,19 @@ export const storeDetails = asyncHandler(async (req, res) => {
         select: {
           id: true,
           value: true,
+          comment: true,
           createdAt: true,
           userId: true,
           user: { select: { id: true, name: true } },
+          replies: {
+            orderBy: { createdAt: 'asc' },
+            select: {
+              id: true,
+              comment: true,
+              createdAt: true,
+              user: { select: { id: true, name: true } },
+            },
+          },
         },
       },
     },
@@ -102,8 +112,10 @@ export const storeDetails = asyncHandler(async (req, res) => {
       recentRatings: allRatings.slice(0, 10).map((rating) => ({
         id: rating.id,
         rating: rating.value,
+        comment: rating.comment,
         createdAt: rating.createdAt,
         user: rating.user,
+        replies: rating.replies,
       })),
     },
   });
@@ -111,16 +123,36 @@ export const storeDetails = asyncHandler(async (req, res) => {
 
 export const upsertRating = asyncHandler(async (req, res) => {
   const storeId = idSchema.parse(req.params.storeId);
-  const { value } = ratingSchema.parse(req.body);
+  const { value, comment } = ratingSchema.parse(req.body);
 
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new AppError(404, 'Store not found');
 
   const rating = await prisma.rating.upsert({
     where: { userId_storeId: { userId: req.user.id, storeId } },
-    update: { value },
-    create: { value, userId: req.user.id, storeId },
+    update: { value, comment: comment || null },
+    create: { value, comment: comment || null, userId: req.user.id, storeId },
   });
 
   res.json({ success: true, data: rating, message: 'Rating saved successfully' });
+});
+
+export const createReply = asyncHandler(async (req, res) => {
+  const ratingId = idSchema.parse(req.params.ratingId);
+  const { comment } = replySchema.parse(req.body);
+
+  const rating = await prisma.rating.findUnique({ where: { id: ratingId } });
+  if (!rating) throw new AppError(404, 'Rating not found');
+
+  const reply = await prisma.reply.create({
+    data: { comment, ratingId, userId: req.user.id },
+    select: {
+      id: true,
+      comment: true,
+      createdAt: true,
+      user: { select: { id: true, name: true } },
+    },
+  });
+
+  res.status(201).json({ success: true, data: { reply } });
 });

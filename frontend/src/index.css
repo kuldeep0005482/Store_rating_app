@@ -17,3 +17,8 @@
     font: inherit;
   }
 }
+
+@keyframes routeProgress {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(360%); }
+}

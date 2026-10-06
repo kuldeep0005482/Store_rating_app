@@ -11,8 +11,14 @@ router.get('/:storeId', controller.storeDetails);
 
 router.put(
   '/:storeId/rating',
-  authorize('USER'),
+  authorize('USER', 'STORE_OWNER'),
   controller.upsertRating
+);
+
+router.post(
+  '/ratings/:ratingId/replies',
+  authorize('USER', 'STORE_OWNER'),
+  controller.createReply
 );
 
 export default router;
