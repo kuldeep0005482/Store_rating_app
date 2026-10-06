@@ -1,0 +1,3 @@
+import React from 'react';
+import ChartCard from './ChartCard';
+export default function ProgressRing({value=76,title='Progress / Percentage Ring'}){const r=46,c=2*Math.PI*r,o=c-(value/100)*c;return <ChartCard title={title}><div className="flex justify-center"><div className="relative h-36 w-36"><svg viewBox="0 0 120 120" className="-rotate-90"><circle cx="60" cy="60" r={r} fill="none" stroke="#fee2e2" strokeWidth="10"/><circle cx="60" cy="60" r={r} fill="none" stroke="#dc2626" strokeWidth="10" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={o} className="transition-all duration-700"/></svg><span className="absolute inset-0 flex items-center justify-center text-2xl font-bold">{value}%</span></div></div></ChartCard>}

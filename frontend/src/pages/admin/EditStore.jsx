@@ -1,0 +1,16 @@
+
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import AdminLayout from "../../components/layout/AdminLayout";
+import Card from "../../components/ui/Card";
+import Button from "../../components/ui/Button";
+import { api } from "../../services/api";
+
+export default function EditStore() {
+  const { id }=useParams(); const navigate=useNavigate();
+  const [form,setForm]=useState({name:"",email:"",address:"",category:"",image:"",ownerId:""});
+  const [owners,setOwners]=useState([]); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [error,setError]=useState("");
+  useEffect(()=>{ Promise.all([api.get(`/admin/stores/${id}`),api.get("/admin/users?role=STORE_OWNER&limit=100&sortBy=name&sortOrder=asc")]).then(([s,u])=>{const x=s.data.store;setForm({name:x.name||"",email:x.email||"",address:x.address||"",category:x.category||"",image:x.image||"",ownerId:x.owner?.id||x.ownerId||""});setOwners(u.data||[])}).catch(e=>setError(e.message)).finally(()=>setLoading(false));},[id]);
+  const submit=async e=>{e.preventDefault();setSaving(true);setError("");try{await api.patch(`/admin/stores/${id}`,{...form,ownerId:Number(form.ownerId)});navigate(`/admin/stores/${id}`)}catch(e){setError(e.message)}finally{setSaving(false)}};
+  return <AdminLayout activeItem="Stores"><div className="mx-auto max-w-[800px]"><div className="mb-5"><h1 className="text-2xl font-bold">Edit Store</h1><p className="mt-1 text-sm text-[#6b7280]">Update store information.</p></div><Card>{loading?<p>Loading...</p>:<form onSubmit={submit} className="space-y-4">{error&&<div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}<label className="block text-xs font-semibold">Store Name<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} className="mt-1 w-full rounded-lg border p-2.5" required/></label><label className="block text-xs font-semibold">Email<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} className="mt-1 w-full rounded-lg border p-2.5" required/></label><label className="block text-xs font-semibold">Address<textarea value={form.address} onChange={e=>setForm({...form,address:e.target.value})} className="mt-1 w-full rounded-lg border p-2.5" required/></label><label className="block text-xs font-semibold">Category<input value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className="mt-1 w-full rounded-lg border p-2.5"/></label><label className="block text-xs font-semibold">Image URL<input value={form.image} onChange={e=>setForm({...form,image:e.target.value})} className="mt-1 w-full rounded-lg border p-2.5"/></label><label className="block text-xs font-semibold">Store Owner<select value={form.ownerId} onChange={e=>setForm({...form,ownerId:e.target.value})} className="mt-1 w-full rounded-lg border p-2.5" required><option value="">Select owner</option>{owners.map(o=><option key={o.id} value={o.id}>{o.name} — {o.email}</option>)}</select></label><div className="flex justify-end gap-2"><Button variant="outline" type="button" onClick={()=>navigate(-1)}>Cancel</Button><Button type="submit" disabled={saving}>{saving?"Saving...":"Save Changes"}</Button></div></form>}</Card></div></AdminLayout>;
+}

@@ -1,0 +1,2 @@
+import React from 'react';
+export default function ChartCard({title,description,children,action,className=''}){return <section className={`rounded-xl border border-[#e5e7eb] bg-white p-4 shadow-sm ${className}`}><div className="mb-3 flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-[#111827]">{title}</h3>{description&&<p className="mt-0.5 text-[10px] text-[#6b7280]">{description}</p>}</div>{action}</div>{children}</section>}
